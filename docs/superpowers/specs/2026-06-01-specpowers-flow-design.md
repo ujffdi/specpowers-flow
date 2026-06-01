@@ -86,11 +86,16 @@ orchestrator recomputes the cheap digests; if any verified artifact changed sinc
 only honored when its recorded digests still match disk. This closes the "edit an artifact after
 validation, then archive on stale markers" hole.
 
-**Change-set hash algorithm (exact).** Because each task commits during the TDD loop, a plain
-`git diff` after commits is empty and would falsely read as "no change." The compliance evidence
-therefore records, against `merge-base(HEAD, main)`: the **commit range** `merge-base..HEAD`, the
-**HEAD tree OID**, a **dirty-worktree diff hash** (staged + unstaged), and an **untracked-relevant
-file list** (untracked files under any Implementation-Area path). Archive recomputes all of these.
+**Change-set hash algorithm (exact, repo-agnostic).** Because each task commits during the TDD loop,
+a plain `git diff` after commits is empty and would falsely read as "no change." The compliance
+evidence first **resolves a base ref** (recording `base_ref`, `base_oid`, `merge_base_oid`) in this
+order: a configured base (from project config / CLAUDE.md) → the current branch's upstream
+(`@{upstream}`) → first existing of `origin/main`, `main`, `origin/master`, `master`, `trunk`. If
+none is reachable, it **stops with an explicit setup prompt** rather than guessing. Against the
+resolved base it then records: the **commit range** `merge_base_oid..HEAD`, the **HEAD tree OID**, a
+**dirty-worktree diff hash** (staged + unstaged), and an **untracked-relevant file list** (untracked
+files under any Implementation-Area path). Archive recomputes all of these using the same recorded
+base ref.
 **Compliance/archive are blocked if** the computed change set is empty while implementation tasks are
 marked complete, or if relevant untracked files are present (they must be committed or explicitly
 ignored first). This makes the implementation evidence robust to per-task commits.
@@ -281,7 +286,7 @@ MVP is ready for GitHub release when:
 8. The skill explicitly blocks archive before validation, plan coverage, tests, and compliance pass.
 9. Progressive enhancement: detects and uses real `openspec`/Superpowers when present, falls back otherwise.
 10. **Fallback archive is conservative**: with no `openspec` CLI, archive defaults to guided/manual merge with preflight diff + backup; never auto-corrupts living specs; any auto-apply is atomic + conflict-checked + idempotent.
-11. **Gate evidence is content-bound, including implementation**: each passed gate records verified-artifact digests; compliance additionally records the implementation evidence set (coverage-matrix file digests + the exact change-set hash: `merge-base..HEAD` commit range, HEAD tree OID, dirty-diff hash, untracked-relevant list). Editing any verified artifact **or implementation file** invalidates that gate and all downstream gates on resume; archive recomputes the change set and **blocks if it is empty despite completed tasks or has relevant untracked files**.
+11. **Gate evidence is content-bound, including implementation**: each passed gate records verified-artifact digests; compliance additionally records the implementation evidence set (coverage-matrix file digests + the exact change-set hash against a **resolved, recorded base ref** — not a hard-coded `main`: `merge_base_oid..HEAD` commit range, HEAD tree OID, dirty-diff hash, untracked-relevant list). Editing any verified artifact **or implementation file** invalidates that gate and all downstream gates on resume; archive recomputes the change set and **blocks if it is empty despite completed tasks or has relevant untracked files**.
 12. **Behavioral changes require a real spec delta** (in every tier, not only high-risk surfaces); `no-spec-delta` is allowed only for genuinely non-behavioral changes. **Non-overridable escalation**: high-risk surfaces (auth/permissions, data migration, destructive/irreversible ops, tenant/security boundaries, billing) additionally force `standard`/`full` with independent compliance review, regardless of tier or user override. Coverage/compliance must not pass for a behavioral change lacking a delta.
 13. **Structure validator is completeness-checked**: it asserts the exact required file set exists (6 skills, 10 references, README, example, LICENSE, NOTICE, manifest) and fails on any missing path or zero skills — a partial/empty repo cannot report all-passed.
 14. README explains what/when/how-to-install for both Claude Code and Codex.

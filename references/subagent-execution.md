@@ -4,6 +4,10 @@ This reference defines the self-contained execution protocol used by `execute-pl
 It governs how the orchestrator dispatches, reviews, and sequences individual `tasks.md` tasks
 during the build phase of any specpowers-flow change.
 
+> The subagent-driven path described here is the **recommended default but is not forced**.
+> `execute-plan` may also run inline in a single context in any tier — see section 4. Test-first
+> and every gate apply identically regardless of which mode is used.
+
 ---
 
 ## 1. Why a fresh subagent per task
@@ -78,24 +82,39 @@ during execution breaks the compliance gate's ability to verify what was actuall
 
 ---
 
-## 4. Tier scaling
+## 4. Two execution modes: subagent-driven (recommended) or inline
 
-The per-task subagent protocol is tier-scaled to match the weight of the change.
+This protocol describes the **subagent-driven** path, which is the recommended default because of
+the isolation benefits in section 1. It is **not mandatory in any tier**. Mirroring Superpowers —
+which lets you pick `subagent-driven-development` or inline `executing-plans` — `execute-plan` may
+instead run **inline in a single agent context** whenever the implementer or user prefers it,
+including in `standard` and `full`.
 
-**quick** — Tasks may be executed inline within a single agent context (no per-task subagents).
-The full per-task RED→GREEN evidence and two-stage review described above are not required.
-However, the quick tier still mandates at least one real test per behavioral change and still
-requires the RED-before/GREEN-after probe policy from `references/test-driven-development.md`
-for each behavioral task. The divergence rule applies in every tier.
+Whichever mode is chosen, the **gates do not change**: test-first (RED→GREEN) per
+`references/test-driven-development.md`, the no-silent-scope-expansion rule, the divergence rule
+(section 3), evidence capture (section 6), and downstream compliance verification all apply
+identically. The only difference is whether each task runs in its own fresh subagent (isolated
+context, parallel-safe, two-stage review between tasks) or sequentially in one context.
 
-**standard** — One fresh subagent per task. The two-stage review runs stage 1 (correctness) on
-every task and stage 2 (adversarial check via `references/independent-review.md`) on risky tasks
-only. Strict per-task RED→GREEN ordering is enforced.
+### Tier scaling (recommended rigor, not a mandate)
 
-**full** — One fresh subagent per task. The two-stage review runs both stages on every
-code-changing task, not just risky ones. Parallel adversarial reviewers may be used in stage 2
-(multiple lenses: correctness, security, lifecycle), matching the full-tier independent-review
-dispatch in `references/independent-review.md`. Strict per-task RED→GREEN ordering is enforced.
+Tier sets the *recommended* level of rigor; it never forces the subagent path.
+
+**quick** — Inline single-context execution is typical. Per-task subagents and the full two-stage
+review are not expected. The quick tier still mandates at least one real test per behavioral change
+and the RED-before/GREEN-after probe policy from `references/test-driven-development.md` for each
+behavioral task. The divergence rule applies in every tier.
+
+**standard** — Subagent-driven (one fresh subagent per task) is recommended, with stage 1
+(correctness) review on every task and stage 2 (adversarial check via
+`references/independent-review.md`) on risky tasks only. Inline execution is permitted; if chosen,
+the implementer still satisfies strict per-task RED→GREEN ordering and runs the same two reviews
+on the same tasks. Strict per-task RED→GREEN ordering is enforced either way.
+
+**full** — Subagent-driven is strongly recommended, one fresh subagent per task, with both review
+stages on every code-changing task and parallel adversarial reviewers in stage 2 (multiple lenses:
+correctness, security, lifecycle) per `references/independent-review.md`. Inline execution is
+permitted but must still meet every gate above. Strict per-task RED→GREEN ordering is enforced.
 
 ---
 

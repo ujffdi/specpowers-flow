@@ -62,7 +62,7 @@ A multi-skill plugin: **1 orchestrator + 5 phase skills = 6 skills.**
 | `specpowers-brainstorm` | 1 | Idea → problem / scope / success criteria / non-goals / risks / open questions; writes the `proposal.md` draft directly |
 | `specpowers-spec` | 2–3 | Generate OpenSpec artifacts + **harden** (validate + adversarial spec review via independent subagent + sync findings back) |
 | `specpowers-plan` | 4–5 | Plan from the hardened spec (into `tasks.md`) + **requirement coverage matrix** gate |
-| `specpowers-build` | 6–7 | **Subagent-driven, test-first** execution — fresh subagent per `tasks.md` task with two-stage review; each task obeys the RED→GREEN→REFACTOR TDD discipline (failing test before code); no silent scope expansion, diverge → update artifact first — then **compliance verification** via independent subagent |
+| `specpowers-build` | 6–7 | **Test-first** execution of `tasks.md` — every task obeys the RED→GREEN→REFACTOR TDD discipline (failing test before code), with no silent scope expansion and diverge → update artifact first. The **subagent-driven** path (fresh subagent per task + two-stage review) is the recommended default but is **not forced**; inline single-context execution is supported in any tier. Then **compliance verification** via independent subagent |
 | `specpowers-archive` | 8 | Archive-readiness gate checklist + update living specs + final summary |
 
 Each skill = "one self-contained process segment + its gate." `brainstorm` is standalone because
@@ -173,8 +173,16 @@ the orchestrator runs a review (and an independent adversarial check on risky ta
 dispatching the next. This keeps each implementation step in a clean, focused context and prevents
 silent scope drift across the whole change. When real Superpowers is detected, the stage may hand
 off to its `subagent-driven-development`/`executing-plans`; the self-contained path is defined in
-`references/subagent-execution.md`. Tier-scaled: `quick` may execute inline (single context);
-`standard`/`full` use per-task subagents.
+`references/subagent-execution.md`.
+
+**Subagent-driven is recommended, not mandatory.** Mirroring Superpowers (which lets you choose
+`subagent-driven-development` or inline `executing-plans`), `execute-plan` MAY run **inline in a
+single context** in any tier — including `standard`/`full` — when the implementer or user prefers
+it. Per-task subagents are the recommended default for isolation and parallel-safety; inline is the
+supported alternative. The choice does not change the gates: **test-first (RED→GREEN), the
+no-silent-scope-expansion rule, divergence handling, evidence capture, and compliance verification
+apply identically in both modes.** Tier influences the *recommended* rigor (subagents + adversarial
+checks scale up for `full`), but never forces the subagent path.
 
 **Test-driven execution (test-first discipline).** Inside each `execute-plan` task, code is written
 **test-first**: write a failing test that pins the task's spec requirement → run it and confirm it
@@ -284,7 +292,7 @@ MVP is ready for GitHub release when:
 2. All 10 reference templates exist.
 3. Tiering works: a small change can take the `quick` path; a large change takes `full`.
 4. Adversarial gates (harden-spec, verify-compliance) dispatch independent subagents.
-5. **Subagent-driven execution**: in `standard`/`full`, `execute-plan` runs one fresh subagent per `tasks.md` task with a two-stage review between tasks; `quick` may run inline; real Superpowers is used when present.
+5. **Subagent-driven execution (recommended, not forced)**: `execute-plan` supports both a subagent-driven path (fresh subagent per `tasks.md` task + two-stage review — the recommended default) and inline single-context execution, selectable in any tier; tier scales the *recommended* rigor but never forces subagents; real Superpowers is used when present. Test-first and all gates apply identically in both modes.
 6. **Test-first execution**: each `execute-plan` task shows a RED-before/GREEN-after probe — an executable test for code tasks, or a semantic/structure check for non-code tasks (or a recorded exemption for genuinely non-behavioral ones); no implementation without a failing probe first (`standard`/`full` enforce strict per-task RED→GREEN; `quick` requires ≥1 real test per behavioral change).
 7. Stage is correctly inferred from on-disk artifacts (resume works from a cold start).
 8. The skill explicitly blocks archive before validation, plan coverage, tests, and compliance pass.

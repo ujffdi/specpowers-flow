@@ -51,7 +51,7 @@ has to remember.
 | `specpowers-brainstorm` | Stage 1 — raw idea to approved direction and `proposal.md` draft |
 | `specpowers-spec` | Stages 2–3 — generate OpenSpec artifacts, then harden via adversarial spec review |
 | `specpowers-plan` | Stages 4–5 — write the plan into `tasks.md`, then build the requirement coverage matrix |
-| `specpowers-build` | Stages 6–7 — subagent-driven TDD execution (fresh subagent per task) + compliance verification |
+| `specpowers-build` | Stages 6–7 — test-first TDD execution (subagent-driven recommended, inline supported) + compliance verification |
 | `specpowers-archive` | Stage 8 — archive-readiness gate, living-spec update, final summary |
 
 ### 10 reference templates

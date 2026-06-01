@@ -1,19 +1,24 @@
 ---
 name: specpowers-build
-description: Use as stages 6-7 of specpowers-flow — execute the approved plan with subagent-driven TDD (fresh subagent per task) and no silent scope expansion, then verify the implementation complies with the hardened spec via independent adversarial review.
+description: Use as stages 6-7 of specpowers-flow — execute the approved plan test-first (subagent-driven per task recommended, inline single-context supported) with no silent scope expansion, then verify the implementation complies with the hardened spec via independent adversarial review.
 ---
 
 ## Execute-plan (stage 6)
 
-Run the subagent-driven execution protocol in `references/subagent-execution.md`. Each task in `tasks.md` gets its own fresh subagent carrying only the task text, the relevant spec delta, and its coverage-matrix row — keeping context focused and preventing scope from silently drifting across the full change.
+Execute the plan following `references/subagent-execution.md`. Two execution modes are supported, and **subagent-driven is the recommended default but is not forced** (mirroring Superpowers' choice between `subagent-driven-development` and inline `executing-plans`):
 
-Within each task subagent, apply the test-first discipline from `references/test-driven-development.md`: write a failing test that pins the spec requirement (RED), confirm it fails for the stated reason, then write the minimal implementation to make it pass (GREEN), then commit. No implementation is written before a failing test exists. The task subagent returns its diff plus the RED run and GREEN run as evidence.
+- **Subagent-driven (recommended):** each task in `tasks.md` gets its own fresh subagent carrying only the task text, the relevant spec delta, and its coverage-matrix row — keeping context focused and preventing scope from silently drifting across the full change.
+- **Inline:** run the tasks sequentially in a single context. Permitted in any tier, including `standard`/`full`, when the implementer or user prefers it.
 
-Between tasks the orchestrator runs a two-stage review: first, a functional check (does the diff satisfy the task and its coverage-matrix row, was the test RED-before and GREEN-after, do all tests pass); second, an independent adversarial check via `references/independent-review.md` for any risky or code-changing task.
+The execution mode does not change the gates — test-first, no-silent-scope-expansion, divergence handling, evidence, and compliance all apply identically either way.
 
-If the implementation must deviate from the spec or plan, the task subagent stops immediately. The affected artifact (`tasks.md` or the spec delta) is updated first, which invalidates downstream gates per `references/stage-protocol.md`. Work resumes only after the artifact is reconciled.
+Apply the test-first discipline from `references/test-driven-development.md` to every task (in whichever mode): write a failing test that pins the spec requirement (RED), confirm it fails for the stated reason, then write the minimal implementation to make it pass (GREEN), then commit. No implementation is written before a failing test exists. Each task produces its diff plus the RED run and GREEN run as evidence.
 
-Tier scaling: `quick` may execute all tasks inline in a single context, requiring at least one real test per behavioral change. `standard` and `full` use one dedicated subagent per task with strict per-task RED→GREEN ordering; `full` adds the independent adversarial check on every code-changing task, `standard` on risky tasks only.
+Between tasks the orchestrator runs a two-stage review: first, a functional check (does the diff satisfy the task and its coverage-matrix row, was the test RED-before and GREEN-after, do all tests pass); second, an independent adversarial check via `references/independent-review.md` for any risky or code-changing task. These reviews are required in both modes.
+
+If the implementation must deviate from the spec or plan, work stops immediately. The affected artifact (`tasks.md` or the spec delta) is updated first, which invalidates downstream gates per `references/stage-protocol.md`. Work resumes only after the artifact is reconciled.
+
+Tier scaling (recommended rigor, never a mandate to use subagents): `quick` is typically inline, requiring at least one real test per behavioral change. `standard` and `full` recommend one dedicated subagent per task with strict per-task RED→GREEN ordering — `full` adds the independent adversarial check on every code-changing task, `standard` on risky tasks only — but inline execution is permitted in any tier provided it still meets every gate above.
 
 Every task's diff and RED/GREEN test evidence is preserved as the implementation evidence set, feeding the next stage.
 

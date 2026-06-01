@@ -1,6 +1,6 @@
 {
   "name": "specpowers-flow",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "End-to-end spec-driven change workflow: fuses Superpowers process discipline with OpenSpec's spec-driven artifact lifecycle, from idea to archived living spec.",
   "author": {
     "name": "ujffdi"

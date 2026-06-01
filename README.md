@@ -32,7 +32,7 @@ brainstorm → generate-spec → harden-spec → plan-from-spec → check-covera
 | `specpowers-brainstorm` | 阶段 1——把原始想法变成获批方向和 `proposal.md` 草稿 |
 | `specpowers-spec` | 阶段 2–3——生成 OpenSpec 产物，再通过对抗式 spec review 做 harden |
 | `specpowers-plan` | 阶段 4–5——把计划写进 `tasks.md`，再建需求覆盖矩阵 |
-| `specpowers-build` | 阶段 6–7——subagent 驱动的 TDD 执行（每任务一个全新 subagent）+ 合规验证 |
+| `specpowers-build` | 阶段 6–7——test-first 的 TDD 执行（subagent 驱动为推荐默认、内联单上下文亦支持）+ 合规验证 |
 | `specpowers-archive` | 阶段 8——归档就绪闸门、更新活规格、最终总结 |
 
 ### 10 个 reference 模板

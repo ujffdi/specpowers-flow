@@ -1,7 +1,7 @@
 # SpecPowers Flow — Design Spec
 
 - **Date:** 2026-06-01
-- **Status:** Approved (brainstorming phase); hardened via Codex adversarial review (3 findings incorporated — see §6 gate-evidence binding, §7 non-overridable escalation, §8 conservative fallback archive)
+- **Status:** Approved (brainstorming phase); hardened via two Codex adversarial review rounds. Round 1 → §6 gate-evidence binding, §7 non-overridable escalation, §8 conservative fallback archive. Round 2 (on the plan) → §6 implementation-bound compliance evidence, §7 mandatory spec delta for high-risk, §12 validator completeness.
 - **Working name:** `specpowers-flow`
 - **Source PRD:** `/Users/suka/Documents/Tongsr/PRD-specpowers-flow.md` (Codex-generated; superseded where noted)
 
@@ -78,7 +78,9 @@ artifacts are the single source of truth.
 **Gate evidence is bound to artifact content (stale-evidence guard).** Each gate's pass record
 stores the **content digest (hash) + timestamp of every artifact it verified** (e.g. harden-spec
 records the hashes of `proposal.md`/`design.md`/spec deltas it validated; coverage records the
-`tasks.md` + spec hashes; compliance records the spec + implementation-area hashes). On resume the
+`tasks.md` + spec hashes; compliance records the spec hashes **plus the implementation evidence set**
+— the digests of every file named in the coverage matrix's Implementation Area **and the git
+diff/tree hash of the change** — so compliance cannot be honored if code changed after it ran). On resume the
 orchestrator recomputes the cheap digests; if any verified artifact changed since its gate passed,
 **that gate and all downstream gates are invalidated** and the flow routes back. A passed marker is
 only honored when its recorded digests still match disk. This closes the "edit an artifact after
@@ -114,9 +116,11 @@ review and a real spec delta required before archive) when it touches any high-r
 authentication / authorization / permissions, data migration or schema change, destructive or
 irreversible state changes, tenant / security boundaries, or money / billing. The orchestrator
 detects these from the brainstorm/proposal scope and **cannot** be downgraded by tier selection or
-user override. A code-changing archive always requires either a spec delta or an explicit, recorded
-"no-spec-delta" justification. `quick` is only eligible for genuinely small, reversible,
-non-security-sensitive changes.
+user override. **High-risk surfaces require a real spec delta** — there is no "justification instead
+of a delta" escape for them, because compliance and archive need a living-spec contract to verify
+against. A recorded `no-spec-delta` exception is allowed **only** for independently-reviewed,
+genuinely non-behavioral changes (e.g. pure docs/formatting) and must be narrow and logged. `quick`
+is only eligible for genuinely small, reversible, non-security-sensitive changes.
 
 | Stage | quick (small / bugfix) | standard (most features) | full (high-risk / large) |
 |---|---|---|---|
@@ -221,11 +225,12 @@ MVP is ready for GitHub release when:
 6. The skill explicitly blocks archive before validation, plan coverage, tests, and compliance pass.
 7. Progressive enhancement: detects and uses real `openspec`/Superpowers when present, falls back otherwise.
 8. **Fallback archive is conservative**: with no `openspec` CLI, archive defaults to guided/manual merge with preflight diff + backup; never auto-corrupts living specs; any auto-apply is atomic + conflict-checked + idempotent.
-9. **Gate evidence is content-bound**: each passed gate records verified-artifact digests; editing a verified artifact invalidates that gate and all downstream gates on resume.
-10. **Non-overridable escalation**: high-risk surfaces (auth/permissions, data migration, destructive/irreversible ops, tenant/security boundaries, billing) force `standard`/`full` with independent compliance review and a spec delta (or recorded justification), regardless of tier or user override.
-11. README explains what/when/how-to-install for both Claude Code and Codex.
-12. At least one complete example flow is included.
-13. No verbatim content copied from the source projects; NOTICE present.
+9. **Gate evidence is content-bound, including implementation**: each passed gate records verified-artifact digests; compliance additionally records the implementation evidence set (coverage-matrix files + git diff/tree hash). Editing any verified artifact **or implementation file** invalidates that gate and all downstream gates on resume; archive recomputes the compliance implementation digests before passing.
+10. **Non-overridable escalation**: high-risk surfaces (auth/permissions, data migration, destructive/irreversible ops, tenant/security boundaries, billing) force `standard`/`full` with independent compliance review and a **mandatory real spec delta** (no "justification instead of delta" escape; `no-spec-delta` only for independently-reviewed non-behavioral changes), regardless of tier or user override.
+11. **Structure validator is completeness-checked**: it asserts the exact required file set exists (6 skills, 8 references, README, example, LICENSE, NOTICE, manifest) and fails on any missing path or zero skills — a partial/empty repo cannot report all-passed.
+12. README explains what/when/how-to-install for both Claude Code and Codex.
+13. At least one complete example flow is included.
+14. No verbatim content copied from the source projects; NOTICE present.
 
 ## 13. Success metric
 

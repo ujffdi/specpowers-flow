@@ -70,6 +70,30 @@ fail=0
 ok(){ echo "OK: $1"; }
 bad(){ echo "FAIL: $1"; fail=1; }
 
+# Mode: `--final` enforces the full required-file manifest (use in Tasks 17-18).
+# Without it, missing-file manifest checks are warnings so earlier tasks can run incrementally.
+FINAL=0; [ "${1:-}" = "--final" ] && FINAL=1
+
+# 0. required-file manifest — a partial/empty repo must NOT report all-passed
+REQUIRED=(
+  .claude-plugin/plugin.json README.md LICENSE NOTICE examples/generic-feature-flow.md
+  skills/specpowers-flow/SKILL.md skills/specpowers-brainstorm/SKILL.md
+  skills/specpowers-spec/SKILL.md skills/specpowers-plan/SKILL.md
+  skills/specpowers-build/SKILL.md skills/specpowers-archive/SKILL.md
+  references/stage-protocol.md references/openspec-artifact-format.md
+  references/tiering-rules.md references/independent-review.md
+  references/adversarial-spec-review.md references/plan-coverage-matrix.md
+  references/compliance-verification.md references/archive-checklist.md
+)
+missing=0
+for p in "${REQUIRED[@]}"; do
+  if [ -f "$p" ]; then :; else missing=$((missing+1)); [ "$FINAL" -eq 1 ] && bad "required file missing: $p" || echo "PENDING: $p"; fi
+done
+[ "$missing" -eq 0 ] && ok "all ${#REQUIRED[@]} required files present"
+# fail on zero skills regardless of mode
+skill_count=$(find skills -maxdepth 2 -name SKILL.md 2>/dev/null | wc -l | tr -d ' ')
+[ "${skill_count:-0}" -ge 1 ] && ok "skills present ($skill_count)" || bad "zero skills found"
+
 # 1. plugin.json valid JSON with required keys
 if [ -f .claude-plugin/plugin.json ]; then
   if jq -e '.name and .version and .description' .claude-plugin/plugin.json >/dev/null 2>&1; then
@@ -106,7 +130,7 @@ exit "$fail"
 - [ ] **Step 2: Run it to verify it fails**
 
 Run: `chmod +x scripts/validate-plugin.sh && bash scripts/validate-plugin.sh`
-Expected: FAIL — `FAIL: plugin.json missing` and `VALIDATION FAILED`, exit 1.
+Expected: FAIL — `PENDING:` lines for each not-yet-created file, `FAIL: plugin.json missing`, `FAIL: zero skills found`, and `VALIDATION FAILED`, exit 1.
 
 - [ ] **Step 3: Create `.claude-plugin/plugin.json`**
 
@@ -143,7 +167,7 @@ archive/) are adopted as an interoperable format.
 - [ ] **Step 6: Run validator — plugin.json check passes**
 
 Run: `bash scripts/validate-plugin.sh`
-Expected: `OK: plugin.json valid (name/version/description present)` present. (Skill checks still report nothing because no skills exist yet; that is fine — no FAIL lines for skills.)
+Expected: `OK: plugin.json valid (name/version/description present)` present, plus `PENDING:` lines for skills/references/README/example not yet created. Still `VALIDATION FAILED` overall (zero skills) — that is expected this early; later tasks clear it.
 
 - [ ] **Step 7: Commit**
 
@@ -174,7 +198,7 @@ Required content (write as prose + tables, original wording):
    - `execute-plan` — gate: implementation complete & tests run & evidence preserved.
    - `verify-compliance` — gate: compliance passes & tests pass & no unresolved blocker.
    - `archive` — gate: prior 7 gates passed (+ user confirm when required) → DONE.
-3. **Gate-evidence binding** subsection (spec §6): each passed gate records the content digest + timestamp of every artifact it verified; on resume recompute digests; if a verified artifact changed, invalidate that gate AND all downstream gates and route back. A marker is honored only when recorded digests still match disk. Specify a concrete evidence record shape, e.g. a fenced block stored at `openspec/changes/<change>/.specpowers/gates/<stage>.yaml` with fields `stage`, `passed_at`, `artifacts: [{path, sha256}]`, `result`.
+3. **Gate-evidence binding** subsection (spec §6): each passed gate records the content digest + timestamp of every artifact it verified; on resume recompute digests; if a verified artifact changed, invalidate that gate AND all downstream gates and route back. A marker is honored only when recorded digests still match disk. Specify a concrete evidence record shape, e.g. a fenced block stored at `openspec/changes/<change>/.specpowers/gates/<stage>.yaml` with fields `stage`, `passed_at`, `artifacts: [{path, sha256}]`, `result`. **The `verify-compliance` record additionally carries an `implementation: {files: [{path, sha256}], git_tree: <hash>}` block** (coverage-matrix Implementation-Area files + the change's git diff/tree hash); archive recomputes this before passing so code edited after compliance invalidates the gate.
 4. **Failure routing** subsection: map the 8 interrupted states (spec §6) to the stage each routes back to.
 
 - [ ] **Step 2: Run validator**
@@ -232,7 +256,7 @@ Source of truth: spec §7 (incl. non-overridable escalation).
 Required content:
 1. The tier table (spec §7): rows = the 8 stages, columns = quick/standard/full, cells as in the spec.
 2. Default selection heuristic: how the orchestrator estimates size (files touched, reversibility, blast radius) and picks a tier; user may override **downward only within limits below**.
-3. **Non-overridable escalation** (spec §7): list the high-risk surfaces — authn/authz/permissions, data migration/schema change, destructive/irreversible state changes, tenant/security boundaries, money/billing. Any match forces `standard`/`full`, independent compliance review, and a spec delta (or recorded `no-spec-delta` justification) before archive. Tier choice and user override **cannot** bypass this.
+3. **Non-overridable escalation** (spec §7): list the high-risk surfaces — authn/authz/permissions, data migration/schema change, destructive/irreversible state changes, tenant/security boundaries, money/billing. Any match forces `standard`/`full`, independent compliance review, and a **mandatory real spec delta** before archive. There is **no** "justification instead of a delta" escape for high-risk surfaces; a recorded `no-spec-delta` exception is allowed **only** for independently-reviewed, genuinely non-behavioral changes (pure docs/formatting) and must be narrow and logged. Tier choice and user override **cannot** bypass this.
 4. State the spine `spec → coverage → compliance` is mandatory in standard/full and only compressed (never removed) in quick; quick is eligible only for small, reversible, non-security-sensitive changes.
 
 - [ ] **Step 2: Run validator** → Expected: no new FAIL lines.
@@ -329,9 +353,10 @@ Source of truth: spec §11 item 7 + PRD FR-008.
 
 Required content: how to verify the final implementation against the hardened spec before archive:
 1. Inputs: hardened spec deltas, coverage matrix, test/verification evidence.
-2. Checks: literal-but-incomplete compliance (business closure, not just wording), missing failure paths, missing tests, behavior outside approved spec.
-3. Use the independent-review pattern (`references/independent-review.md`) for the adversarial implementation review.
-4. Pass rule: compliance passes + tests pass + no unresolved blocker. Records evidence digests per the gate-evidence binding in `references/stage-protocol.md`.
+2. **Define the implementation evidence set explicitly:** the digests of every file named in the coverage matrix's Implementation Area, **plus the git diff/tree hash of the change**. This binds the compliance verdict to the actual code reviewed.
+3. Checks: literal-but-incomplete compliance (business closure, not just wording), missing failure paths, missing tests, behavior outside approved spec.
+4. Use the independent-review pattern (`references/independent-review.md`) for the adversarial implementation review.
+5. Pass rule: compliance passes + tests pass + no unresolved blocker. Records the spec digests **and the implementation evidence set** per the gate-evidence binding in `references/stage-protocol.md`. If any implementation file or the git tree changes after this gate, the compliance gate is invalidated and must re-run.
 
 - [ ] **Step 2: Run validator** → Expected: no new FAIL lines.
 - [ ] **Step 3: Commit**
@@ -353,7 +378,7 @@ Source of truth: spec §8 (conservative fallback archive) + §11 item 8 + PRD FR
 - [ ] **Step 1: Write the file**
 
 Required content:
-1. Archive prerequisites checklist (all 7 prior gates passed, with their evidence digests still matching disk; user confirmation when required by tier/escalation).
+1. Archive prerequisites checklist (all 7 prior gates passed, with their evidence digests still matching disk; user confirmation when required by tier/escalation). **Before passing, recompute the compliance gate's implementation evidence set** (coverage-matrix files + git diff/tree hash) and block archive if any changed since verify-compliance ran — so code edited after compliance cannot be archived on stale evidence. For high-risk surfaces, also assert a real spec delta exists (no `no-spec-delta` escape).
 2. **Conservative fallback archive** (spec §8): when real `openspec archive` is absent — produce a preflight diff of each spec delta vs the target living spec, write a timestamped backup of affected `openspec/specs/` files, surface conflicts, require explicit confirmation per merge; any auto-apply must use atomic write-and-rename + conflict detection + a retry-safe idempotency marker; never report "archived/complete" unless the merge succeeded and verified.
 3. Required archive summary: change name, final implementation summary, verification summary, archive path/command result, residual risks.
 
@@ -607,10 +632,10 @@ Required sections:
 6. Usage: the trigger phrases; new change vs resume.
 7. Relationship to Superpowers & OpenSpec (inspired-by, not required; progressive enhancement) + link to NOTICE.
 
-- [ ] **Step 2: Run full validator — everything passes**
+- [ ] **Step 2: Run full validator in final mode — everything passes**
 
-Run: `bash scripts/validate-plugin.sh`
-Expected: ends with `ALL CHECKS PASSED`, exit 0. No FAIL lines anywhere.
+Run: `bash scripts/validate-plugin.sh --final`
+Expected: `OK: all 19 required files present`, ends with `ALL CHECKS PASSED`, exit 0. No FAIL/PENDING lines anywhere.
 
 - [ ] **Step 3: Commit**
 
@@ -625,10 +650,10 @@ git commit -m "docs: add README with install and usage for Claude Code + Codex"
 
 **Files:** none created (verification + fixes only).
 
-- [ ] **Step 1: Full structure validation**
+- [ ] **Step 1: Full structure validation (final mode)**
 
-Run: `bash scripts/validate-plugin.sh`
-Expected: `ALL CHECKS PASSED`, exit 0.
+Run: `bash scripts/validate-plugin.sh --final`
+Expected: `OK: all 19 required files present`, `ALL CHECKS PASSED`, exit 0. Any `FAIL:`/`PENDING:` line blocks completion.
 
 - [ ] **Step 2: Cross-reference completeness — every reference is actually used**
 

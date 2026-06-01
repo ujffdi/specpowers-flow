@@ -112,23 +112,30 @@ changes (docs / formatting / comments).
 
 ### Claude Code
 
-1. Clone the repository into your Claude Code plugins directory:
+**Option A (recommended): install via the plugin marketplace.** This repository ships a
+`.claude-plugin/marketplace.json`, so it can be added as a marketplace directly:
 
-   ```bash
-   git clone https://github.com/ujffdi/specpowers-flow \
-     ~/.claude/plugins/specpowers-flow
-   ```
+```
+/plugin marketplace add ujffdi/specpowers-flow
+/plugin install specpowers-flow@specpowers-flow
+```
 
-   Alternatively, install via the Claude Code plugin marketplace if it is listed there.
+The first line registers this repository as a marketplace named `specpowers-flow`; the
+second installs the plugin of the same name from it.
 
-2. The plugin manifest is at `.claude-plugin/plugin.json`. Claude Code reads this to
-   register the plugin name, version, and description.
+**Option B: clone manually.** Clone the repository into your Claude Code plugins directory:
 
-3. Skills are under `skills/<name>/SKILL.md` — for example,
-   `skills/specpowers-flow/SKILL.md` is the orchestrator.
+```bash
+git clone https://github.com/ujffdi/specpowers-flow \
+  ~/.claude/plugins/specpowers-flow
+```
 
-4. Reference templates are at `references/<name>.md` at the repo root — they are shared
-   by all skills and do not need separate installation.
+The plugin manifest is at `.claude-plugin/plugin.json`; Claude Code reads it to register
+the plugin name, version, and description.
+
+Either way: skills are under `skills/<name>/SKILL.md` (for example,
+`skills/specpowers-flow/SKILL.md` is the orchestrator), and reference templates are at
+`references/<name>.md` at the repo root — shared by all skills, no separate installation.
 
 ### Codex
 

@@ -83,20 +83,25 @@ brainstorm → generate-spec → harden-spec → plan-from-spec → check-covera
 
 ### Claude Code
 
-1. 把仓库克隆进你的 Claude Code 插件目录：
+**方式 A（推荐）：通过插件市场安装。** 本仓库自带 `.claude-plugin/marketplace.json`，可直接作为市场添加：
 
-   ```bash
-   git clone https://github.com/ujffdi/specpowers-flow \
-     ~/.claude/plugins/specpowers-flow
-   ```
+```
+/plugin marketplace add ujffdi/specpowers-flow
+/plugin install specpowers-flow@specpowers-flow
+```
 
-   如果它已上架，也可以通过 Claude Code 插件市场安装。
+第一行把本仓库注册为名为 `specpowers-flow` 的市场，第二行从该市场安装同名插件。
 
-2. 插件清单在 `.claude-plugin/plugin.json`。Claude Code 读取它来注册插件的名称、版本和描述。
+**方式 B：手动克隆。** 把仓库克隆进你的 Claude Code 插件目录：
 
-3. Skill 位于 `skills/<name>/SKILL.md`——例如 `skills/specpowers-flow/SKILL.md` 是编排器。
+```bash
+git clone https://github.com/ujffdi/specpowers-flow \
+  ~/.claude/plugins/specpowers-flow
+```
 
-4. Reference 模板位于仓库根目录的 `references/<name>.md`——它们被所有 skill 共享，无需单独安装。
+插件清单在 `.claude-plugin/plugin.json`，Claude Code 读取它来注册插件的名称、版本和描述。
+
+无论哪种方式：Skill 位于 `skills/<name>/SKILL.md`（例如 `skills/specpowers-flow/SKILL.md` 是编排器）；Reference 模板位于仓库根目录的 `references/<name>.md`，被所有 skill 共享，无需单独安装。
 
 ### Codex
 

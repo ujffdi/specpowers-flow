@@ -1,0 +1,21 @@
+{
+  "name": "specpowers-flow",
+  "owner": {
+    "name": "ujffdi",
+    "url": "https://github.com/ujffdi"
+  },
+  "metadata": {
+    "description": "Marketplace for the specpowers-flow plugin — an end-to-end, spec-driven engineering workflow fusing Superpowers process discipline with OpenSpec's artifact lifecycle.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "specpowers-flow",
+      "source": "./",
+      "description": "End-to-end spec-driven change workflow: fuses Superpowers process discipline with OpenSpec's spec-driven artifact lifecycle, from idea to archived living spec. Cross-platform (Claude Code + Codex).",
+      "version": "0.1.0",
+      "license": "MIT",
+      "homepage": "https://github.com/ujffdi/specpowers-flow"
+    }
+  ]
+}

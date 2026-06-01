@@ -1,7 +1,7 @@
 # SpecPowers Flow — Design Spec
 
 - **Date:** 2026-06-01
-- **Status:** Approved (brainstorming phase)
+- **Status:** Approved (brainstorming phase); hardened via Codex adversarial review (3 findings incorporated — see §6 gate-evidence binding, §7 non-overridable escalation, §8 conservative fallback archive)
 - **Working name:** `specpowers-flow`
 - **Source PRD:** `/Users/suka/Documents/Tongsr/PRD-specpowers-flow.md` (Codex-generated; superseded where noted)
 
@@ -75,6 +75,15 @@ The orchestrator drives an explicit 8-stage machine. **Stage is inferred by scan
 table, etc.). A `.specpowers-state.yaml` may cache hints but is **never authoritative** — disk
 artifacts are the single source of truth.
 
+**Gate evidence is bound to artifact content (stale-evidence guard).** Each gate's pass record
+stores the **content digest (hash) + timestamp of every artifact it verified** (e.g. harden-spec
+records the hashes of `proposal.md`/`design.md`/spec deltas it validated; coverage records the
+`tasks.md` + spec hashes; compliance records the spec + implementation-area hashes). On resume the
+orchestrator recomputes the cheap digests; if any verified artifact changed since its gate passed,
+**that gate and all downstream gates are invalidated** and the flow routes back. A passed marker is
+only honored when its recorded digests still match disk. This closes the "edit an artifact after
+validation, then archive on stale markers" hole.
+
 ```
 [brainstorm]        gate: direction approved & requirement specific enough
 [generate-spec]     gate: change dir exists & required artifacts present
@@ -98,6 +107,16 @@ diverges from spec; tests fail; compliance verification fails; archive requested
 The orchestrator selects a tier from change size; the user can override. The spine
 `spec → coverage → compliance` is mandatory in `standard`/`full`; `quick` compresses but never
 removes it.
+
+**Non-overridable escalation (quick-tier safety guard).** Regardless of size classification or a
+user-requested `quick`, a change is **forced to `standard` or `full`** (with independent compliance
+review and a real spec delta required before archive) when it touches any high-risk surface:
+authentication / authorization / permissions, data migration or schema change, destructive or
+irreversible state changes, tenant / security boundaries, or money / billing. The orchestrator
+detects these from the brainstorm/proposal scope and **cannot** be downgraded by tier selection or
+user override. A code-changing archive always requires either a spec delta or an explicit, recorded
+"no-spec-delta" justification. `quick` is only eligible for genuinely small, reversible,
+non-security-sensitive changes.
 
 | Stage | quick (small / bugfix) | standard (most features) | full (high-risk / large) |
 |---|---|---|---|
@@ -126,6 +145,15 @@ Platform mapping (Claude Code `Agent`/`Task`; Codex subagent) lives in
 If present, it uses the real `openspec validate` / `openspec archive` (true schema validation and
 spec-merge) and may hand off brainstorm/plan/execute to Superpowers. If absent, it falls back to
 the built-in markdown procedures. Runs everywhere; more robust where real tools exist.
+
+**Fallback archive is conservative (no silent spec corruption).** When the real `openspec archive`
+is unavailable, the fallback **does not auto-mutate living specs by default**. Instead it runs in
+**guided/manual mode**: produce a preflight diff of every spec-delta against the target living spec,
+write a timestamped backup of the affected `openspec/specs/` files, surface conflicts, and require
+explicit user confirmation to apply each merge. Any automatic apply path is gated behind
+atomic write-and-rename, conflict detection, and a retry-safe idempotency marker so a partial or
+re-run archive cannot duplicate or corrupt living-spec content. The fallback never reports the
+workflow "archived/complete" unless the merge actually succeeded and verified.
 
 ## 9. Repository structure
 
@@ -192,9 +220,12 @@ MVP is ready for GitHub release when:
 5. Stage is correctly inferred from on-disk artifacts (resume works from a cold start).
 6. The skill explicitly blocks archive before validation, plan coverage, tests, and compliance pass.
 7. Progressive enhancement: detects and uses real `openspec`/Superpowers when present, falls back otherwise.
-8. README explains what/when/how-to-install for both Claude Code and Codex.
-9. At least one complete example flow is included.
-10. No verbatim content copied from the source projects; NOTICE present.
+8. **Fallback archive is conservative**: with no `openspec` CLI, archive defaults to guided/manual merge with preflight diff + backup; never auto-corrupts living specs; any auto-apply is atomic + conflict-checked + idempotent.
+9. **Gate evidence is content-bound**: each passed gate records verified-artifact digests; editing a verified artifact invalidates that gate and all downstream gates on resume.
+10. **Non-overridable escalation**: high-risk surfaces (auth/permissions, data migration, destructive/irreversible ops, tenant/security boundaries, billing) force `standard`/`full` with independent compliance review and a spec delta (or recorded justification), regardless of tier or user override.
+11. README explains what/when/how-to-install for both Claude Code and Codex.
+12. At least one complete example flow is included.
+13. No verbatim content copied from the source projects; NOTICE present.
 
 ## 13. Success metric
 

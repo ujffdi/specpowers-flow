@@ -1,0 +1,8 @@
+{
+  "name": "specpowers-flow",
+  "version": "0.1.0",
+  "description": "End-to-end spec-driven change workflow: fuses Superpowers process discipline with OpenSpec's spec-driven artifact lifecycle, from idea to archived living spec.",
+  "author": { "name": "suka" },
+  "homepage": "https://github.com/suka/specpowers-flow",
+  "license": "MIT"
+}

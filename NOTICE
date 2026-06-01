@@ -1,0 +1,10 @@
+specpowers-flow
+Copyright 2026 suka — MIT License.
+
+This project is an independent work, inspired by but not derived from:
+  - Superpowers (process-discipline skills) — see its repository for its license.
+  - OpenSpec (spec-driven artifact lifecycle) — see its repository for its license.
+
+No source text was copied from either project; all content here is original.
+The OpenSpec directory/file conventions (openspec/changes, openspec/specs,
+archive/) are adopted as an interoperable format.

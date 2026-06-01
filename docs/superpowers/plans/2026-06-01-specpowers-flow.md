@@ -43,6 +43,12 @@
 
 **Build order rationale:** validator first (gives every later task a test), then repo shell, then references (the contract everything aligns to), then the orchestrator (binds the contract), then phase skills, then example + README (which exercise/describe the finished whole).
 
+**Test-first for this (doc-only) plan:** these tasks ship markdown/JSON, not executable code, so each
+task's RED→GREEN probe is `scripts/validate-plugin.sh`: the relevant check is `PENDING`/`FAIL` before
+the file exists (RED) and `OK` after (GREEN). That is the non-code-task policy from
+`references/test-driven-development.md` applied to building this plugin — every "Run validator" step
+below is the GREEN of a probe that was RED in the prior step.
+
 **Shared content conventions (apply to every SKILL.md):**
 - Frontmatter is exactly two keys: `name` (must equal the parent directory name) and `description` (one line, includes trigger phrases).
 - Body references templates by relative path `references/<file>.md` and says *when* to read each.
@@ -201,7 +207,7 @@ Required content (write as prose + tables, original wording):
    - `execute-plan` — gate: implementation complete & tests run & evidence preserved.
    - `verify-compliance` — gate: compliance passes & tests pass & no unresolved blocker.
    - `archive` — gate: prior 7 gates passed (+ user confirm when required) → DONE.
-3. **Gate-evidence binding** subsection (spec §6): each passed gate records the content digest + timestamp of every artifact it verified; on resume recompute digests; if a verified artifact changed, invalidate that gate AND all downstream gates and route back. A marker is honored only when recorded digests still match disk. Specify a concrete evidence record shape, e.g. a fenced block stored at `openspec/changes/<change>/.specpowers/gates/<stage>.yaml` with fields `stage`, `passed_at`, `artifacts: [{path, sha256}]`, `result`. **The `verify-compliance` record additionally carries an `implementation: {files: [{path, sha256}], git_tree: <hash>}` block** (coverage-matrix Implementation-Area files + the change's git diff/tree hash); archive recomputes this before passing so code edited after compliance invalidates the gate.
+3. **Gate-evidence binding** subsection (spec §6): each passed gate records the content digest + timestamp of every artifact it verified; on resume recompute digests; if a verified artifact changed, invalidate that gate AND all downstream gates and route back. A marker is honored only when recorded digests still match disk. Specify a concrete evidence record shape, e.g. a fenced block stored at `openspec/changes/<change>/.specpowers/gates/<stage>.yaml` with fields `stage`, `passed_at`, `artifacts: [{path, sha256}]`, `result`. **The `verify-compliance` record additionally carries an `implementation` block** with the coverage-matrix Implementation-Area file digests **and a precisely-defined change set** computed against `merge-base(HEAD, main)`: `commit_range: merge-base..HEAD`, `head_tree: <OID>`, `dirty_diff_sha256: <hash of staged+unstaged diff>`, `untracked_relevant: [<paths>]`. Archive recomputes all of these before passing; **block compliance/archive if the change set is empty while implementation tasks are complete, or if relevant untracked files are present** (must be committed or ignored first). This survives the per-task commits that the TDD loop makes (a plain `git diff` would be empty after commits).
 4. **Failure routing** subsection: map the 8 interrupted states (spec §6) to the stage each routes back to.
 
 - [ ] **Step 2: Run validator**
@@ -261,6 +267,7 @@ Required content:
 2. Default selection heuristic: how the orchestrator estimates size (files touched, reversibility, blast radius) and picks a tier; user may override **downward only within limits below**.
 3. **Non-overridable escalation** (spec §7): list the high-risk surfaces — authn/authz/permissions, data migration/schema change, destructive/irreversible state changes, tenant/security boundaries, money/billing. Any match forces `standard`/`full`, independent compliance review, and a **mandatory real spec delta** before archive. There is **no** "justification instead of a delta" escape for high-risk surfaces; a recorded `no-spec-delta` exception is allowed **only** for independently-reviewed, genuinely non-behavioral changes (pure docs/formatting) and must be narrow and logged. Tier choice and user override **cannot** bypass this.
 4. State the spine `spec → coverage → compliance` is mandatory in standard/full and only compressed (never removed) in quick; quick is eligible only for small, reversible, non-security-sensitive changes.
+5. **Behavioral-change delta rule** (applies in every tier, including quick): any change that alters behavior **requires a real spec delta** before coverage/compliance can pass — without it those gates have no contract to verify against. `quick`'s "delta optional" applies **only** to genuinely non-behavioral changes (docs/formatting), which may take a recorded `no-spec-delta` exemption. Coverage/compliance must fail for a behavioral change lacking a delta.
 
 - [ ] **Step 2: Run validator** → Expected: no new FAIL lines.
 - [ ] **Step 3: Commit**
@@ -340,9 +347,10 @@ Required content (the self-contained test-first discipline used inside each `exe
 1. The loop: **write a failing test** that pins the task's spec requirement → **run it, confirm it fails for the right reason (RED)** → **write the minimal implementation** → **run it green (GREEN)** → **refactor** → **commit**. State plainly: **no implementation is written without a failing test first.**
 2. **Test-first sub-gate of `execute-plan`:** a task is not "done" unless it introduced or extended a test that was RED before its code and GREEN after. The task subagent must show the RED run and the GREEN run as evidence.
 3. What counts as a proper test: tests behavior/requirement (not implementation detail), fails for the stated reason, is deterministic, and maps to a coverage-matrix row. Anti-patterns to reject: tests written after the code to rubber-stamp it, tautological asserts, tests that never failed.
-4. Tier scaling: `standard`/`full` enforce strict per-task RED→GREEN ordering; `quick` requires at least one real test per change but may relax strict per-task ordering.
-5. Relationship to other refs: complements `references/plan-coverage-matrix.md` (every requirement has a verification path) and `references/compliance-verification.md` (catches missing tests); the RED/GREEN evidence feeds the `execute-plan` gate per `references/subagent-execution.md`.
-6. Progressive enhancement: hand off to real Superpowers `test-driven-development` when present; otherwise use this protocol.
+4. **Non-code task policy:** not every task ships executable code (docs, config, a reference file). For these the "test" is a **semantic/structure check** that is RED before the task and GREEN after — e.g. a validator/lint/schema check that fails because the file/section is absent and passes once it exists and is well-formed (this is exactly how this plan's own doc tasks use `scripts/validate-plugin.sh`: `PENDING/FAIL` before → `OK` after). The task must show that check failing first and passing after. Only genuinely non-behavioral changes with no meaningful check may take a **recorded exemption** with a rationale. The test-first sub-gate verifies *this policy* (a RED-before/GREEN-after probe OR a recorded exemption), not a literal unit test — so the flow is neither impossible for non-code tasks nor satisfiable by post-hoc validation alone.
+5. Tier scaling: `standard`/`full` enforce strict per-task RED→GREEN ordering; `quick` requires at least one real test per behavioral change but may relax strict per-task ordering.
+6. Relationship to other refs: complements `references/plan-coverage-matrix.md` (every requirement has a verification path) and `references/compliance-verification.md` (catches missing tests); the RED/GREEN evidence feeds the `execute-plan` gate per `references/subagent-execution.md`.
+7. Progressive enhancement: hand off to real Superpowers `test-driven-development` when present; otherwise use this protocol.
 
 - [ ] **Step 2: Run validator** → Expected: no new FAIL lines.
 - [ ] **Step 3: Commit**
@@ -410,7 +418,7 @@ Source of truth: spec §11 item 8 + PRD FR-008.
 
 Required content: how to verify the final implementation against the hardened spec before archive:
 1. Inputs: hardened spec deltas, coverage matrix, test/verification evidence.
-2. **Define the implementation evidence set explicitly:** the digests of every file named in the coverage matrix's Implementation Area, **plus the git diff/tree hash of the change**. This binds the compliance verdict to the actual code reviewed.
+2. **Define the implementation evidence set explicitly:** the digests of every file named in the coverage matrix's Implementation Area, **plus a precisely-defined change-set** against `merge-base(HEAD, main)` — `commit_range: merge-base..HEAD`, `head_tree` OID, a `dirty_diff` hash over staged+unstaged changes, and an `untracked_relevant` list (untracked files under any Implementation-Area path). Specify the exact `git` commands. This binds the compliance verdict to the actual code reviewed and survives per-task commits (a plain `git diff` is empty after commits). **Block compliance if the computed change set is empty while implementation tasks are complete, or if relevant untracked files exist.**
 3. Checks: literal-but-incomplete compliance (business closure, not just wording), missing failure paths, missing tests, behavior outside approved spec.
 4. Use the independent-review pattern (`references/independent-review.md`) for the adversarial implementation review.
 5. Pass rule: compliance passes + tests pass + no unresolved blocker. Records the spec digests **and the implementation evidence set** per the gate-evidence binding in `references/stage-protocol.md`. If any implementation file or the git tree changes after this gate, the compliance gate is invalidated and must re-run.
@@ -435,7 +443,7 @@ Source of truth: spec §8 (conservative fallback archive) + §11 item 9 + PRD FR
 - [ ] **Step 1: Write the file**
 
 Required content:
-1. Archive prerequisites checklist (all 7 prior gates passed, with their evidence digests still matching disk; user confirmation when required by tier/escalation). **Before passing, recompute the compliance gate's implementation evidence set** (coverage-matrix files + git diff/tree hash) and block archive if any changed since verify-compliance ran — so code edited after compliance cannot be archived on stale evidence. For high-risk surfaces, also assert a real spec delta exists (no `no-spec-delta` escape).
+1. Archive prerequisites checklist (all 7 prior gates passed, with their evidence digests still matching disk; user confirmation when required by tier/escalation). **Before passing, recompute the compliance gate's implementation evidence set** (coverage-matrix file digests + the change-set: `merge-base..HEAD` range, HEAD tree OID, dirty-diff hash, untracked-relevant list) and block archive if any changed since verify-compliance ran, **or if the change set is empty while tasks are complete, or relevant untracked files are present** — so code edited/uncommitted after compliance cannot be archived on stale evidence. For any **behavioral** change, assert a real spec delta exists (no `no-spec-delta` escape; that exemption is non-behavioral-only).
 2. **Conservative fallback archive** (spec §8): when real `openspec archive` is absent — produce a preflight diff of each spec delta vs the target living spec, write a timestamped backup of affected `openspec/specs/` files, surface conflicts, require explicit confirmation per merge; any auto-apply must use atomic write-and-rename + conflict detection + a retry-safe idempotency marker; never report "archived/complete" unless the merge succeeded and verified.
 3. Required archive summary: change name, final implementation summary, verification summary, archive path/command result, residual risks.
 

@@ -79,12 +79,21 @@ artifacts are the single source of truth.
 stores the **content digest (hash) + timestamp of every artifact it verified** (e.g. harden-spec
 records the hashes of `proposal.md`/`design.md`/spec deltas it validated; coverage records the
 `tasks.md` + spec hashes; compliance records the spec hashes **plus the implementation evidence set**
-— the digests of every file named in the coverage matrix's Implementation Area **and the git
-diff/tree hash of the change** — so compliance cannot be honored if code changed after it ran). On resume the
+— the digests of every file named in the coverage matrix's Implementation Area **and a precisely
+defined change-set hash** — so compliance cannot be honored if code changed after it ran). On resume the
 orchestrator recomputes the cheap digests; if any verified artifact changed since its gate passed,
 **that gate and all downstream gates are invalidated** and the flow routes back. A passed marker is
 only honored when its recorded digests still match disk. This closes the "edit an artifact after
 validation, then archive on stale markers" hole.
+
+**Change-set hash algorithm (exact).** Because each task commits during the TDD loop, a plain
+`git diff` after commits is empty and would falsely read as "no change." The compliance evidence
+therefore records, against `merge-base(HEAD, main)`: the **commit range** `merge-base..HEAD`, the
+**HEAD tree OID**, a **dirty-worktree diff hash** (staged + unstaged), and an **untracked-relevant
+file list** (untracked files under any Implementation-Area path). Archive recomputes all of these.
+**Compliance/archive are blocked if** the computed change set is empty while implementation tasks are
+marked complete, or if relevant untracked files are present (they must be committed or explicitly
+ignored first). This makes the implementation evidence robust to per-task commits.
 
 ```
 [brainstorm]        gate: direction approved & requirement specific enough
@@ -122,10 +131,17 @@ against. A recorded `no-spec-delta` exception is allowed **only** for independen
 genuinely non-behavioral changes (e.g. pure docs/formatting) and must be narrow and logged. `quick`
 is only eligible for genuinely small, reversible, non-security-sensitive changes.
 
+**Any behavioral change requires a real spec delta** (not only high-risk ones). Without a delta the
+coverage and compliance gates have no living-spec contract to verify against and become
+self-referential. The `no-spec-delta` exception is therefore allowed **only** for genuinely
+non-behavioral changes (docs/formatting/comments), recorded and independently reviewed; `quick`'s
+"delta optional" applies to exactly that non-behavioral case and nothing else. Coverage and
+compliance must not pass for a behavioral change that has no spec delta.
+
 | Stage | quick (small / bugfix) | standard (most features) | full (high-risk / large) |
 |---|---|---|---|
 | brainstorm | skip, inline one-liner | light | full |
-| generate-spec | proposal + tasks only, delta optional | full artifacts | full |
+| generate-spec | proposal + tasks; **spec delta required for any behavioral change** (optional only for non-behavioral) | full artifacts | full |
 | harden-spec | self-check | **1 independent adversarial subagent** | **parallel adversarial subagents** |
 | plan | inline in tasks.md | tasks.md | separate plan + tasks |
 | check-coverage | quick checklist | coverage matrix | matrix + re-check |
@@ -162,6 +178,17 @@ Superpowers `test-driven-development` when present). Tier note: `quick` still re
 real test per change but may relax strict per-task RED→GREEN ordering; `standard`/`full` enforce it
 per task. This complements the coverage matrix (every requirement has a verification path) and
 compliance verification (catches missing tests).
+
+*Non-code task policy.* Not every task ships executable code (e.g. docs, config, or a reference
+file — including the tasks that build this very plugin). For such tasks the "test" is a **semantic
+or structure check** that is RED before the task and GREEN after: e.g. a validator/lint/schema check
+that fails because the file/section is absent and passes once it exists and is well-formed. The task
+must show that check failing first and passing after — same RED→GREEN evidence, different probe. Only
+genuinely non-behavioral changes with no meaningful check may take a **recorded exemption** with a
+rationale; they never count toward the test-first guarantee for behavioral code. The test-first
+sub-gate verifies *this policy* (a RED-before/GREEN-after probe or a recorded exemption), not a
+literal unit test, so the flow is neither impossible for non-code tasks nor satisfiable by post-hoc
+validation alone.
 
 **Artifact-inferred state.** See §6. Detection logic lives in the orchestrator skill.
 
@@ -249,13 +276,13 @@ MVP is ready for GitHub release when:
 3. Tiering works: a small change can take the `quick` path; a large change takes `full`.
 4. Adversarial gates (harden-spec, verify-compliance) dispatch independent subagents.
 5. **Subagent-driven execution**: in `standard`/`full`, `execute-plan` runs one fresh subagent per `tasks.md` task with a two-stage review between tasks; `quick` may run inline; real Superpowers is used when present.
-6. **Test-first execution**: each `execute-plan` task introduces/extends a test that was RED before its code and GREEN after; no implementation without a failing test first (`standard`/`full` enforce strict per-task RED→GREEN; `quick` requires ≥1 real test per change).
+6. **Test-first execution**: each `execute-plan` task shows a RED-before/GREEN-after probe — an executable test for code tasks, or a semantic/structure check for non-code tasks (or a recorded exemption for genuinely non-behavioral ones); no implementation without a failing probe first (`standard`/`full` enforce strict per-task RED→GREEN; `quick` requires ≥1 real test per behavioral change).
 7. Stage is correctly inferred from on-disk artifacts (resume works from a cold start).
 8. The skill explicitly blocks archive before validation, plan coverage, tests, and compliance pass.
 9. Progressive enhancement: detects and uses real `openspec`/Superpowers when present, falls back otherwise.
 10. **Fallback archive is conservative**: with no `openspec` CLI, archive defaults to guided/manual merge with preflight diff + backup; never auto-corrupts living specs; any auto-apply is atomic + conflict-checked + idempotent.
-11. **Gate evidence is content-bound, including implementation**: each passed gate records verified-artifact digests; compliance additionally records the implementation evidence set (coverage-matrix files + git diff/tree hash). Editing any verified artifact **or implementation file** invalidates that gate and all downstream gates on resume; archive recomputes the compliance implementation digests before passing.
-12. **Non-overridable escalation**: high-risk surfaces (auth/permissions, data migration, destructive/irreversible ops, tenant/security boundaries, billing) force `standard`/`full` with independent compliance review and a **mandatory real spec delta** (no "justification instead of delta" escape; `no-spec-delta` only for independently-reviewed non-behavioral changes), regardless of tier or user override.
+11. **Gate evidence is content-bound, including implementation**: each passed gate records verified-artifact digests; compliance additionally records the implementation evidence set (coverage-matrix file digests + the exact change-set hash: `merge-base..HEAD` commit range, HEAD tree OID, dirty-diff hash, untracked-relevant list). Editing any verified artifact **or implementation file** invalidates that gate and all downstream gates on resume; archive recomputes the change set and **blocks if it is empty despite completed tasks or has relevant untracked files**.
+12. **Behavioral changes require a real spec delta** (in every tier, not only high-risk surfaces); `no-spec-delta` is allowed only for genuinely non-behavioral changes. **Non-overridable escalation**: high-risk surfaces (auth/permissions, data migration, destructive/irreversible ops, tenant/security boundaries, billing) additionally force `standard`/`full` with independent compliance review, regardless of tier or user override. Coverage/compliance must not pass for a behavioral change lacking a delta.
 13. **Structure validator is completeness-checked**: it asserts the exact required file set exists (6 skills, 10 references, README, example, LICENSE, NOTICE, manifest) and fails on any missing path or zero skills — a partial/empty repo cannot report all-passed.
 14. README explains what/when/how-to-install for both Claude Code and Codex.
 15. At least one complete example flow is included.

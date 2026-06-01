@@ -11,8 +11,10 @@ to the actual code that was built, not to a cached or approximate snapshot.
 
 Before the compliance gate can run, three input sets must be available and complete:
 
-**Hardened spec deltas.** The `design.md` and each `openspec/specs/<capability>/spec.md` delta
-that `harden-spec` validated and signed off. These define the behavioral contract the
+**Hardened spec deltas.** The `design.md` and each `openspec/changes/<change>/specs/<capability>/spec.md`
+delta that `harden-spec` validated and accepted — the **active change's** deltas, not the post-archive
+living specs under `openspec/specs/`. Verifying against the living spec instead of the change delta
+would measure the implementation against the wrong (old or absent) contract. These define the behavioral contract the
 implementation is measured against. If any of these files has changed since `harden-spec` passed,
 that gate is invalidated and must re-run before compliance can proceed.
 
@@ -271,7 +273,7 @@ passed_at: <ISO-8601 timestamp>
 artifacts:
   - path: openspec/changes/<change>/design.md
     sha256: <hex>
-  - path: openspec/specs/<capability>/spec.md
+  - path: openspec/changes/<change>/specs/<capability>/spec.md
     sha256: <hex>
   - ...
 implementation:

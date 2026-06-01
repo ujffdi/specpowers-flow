@@ -23,7 +23,7 @@ artifacts are the single source of truth.
 | Stage | Input | Output artifact(s) | Completion gate | Next action | Failure handling |
 |---|---|---|---|---|---|
 | `brainstorm` | Raw idea or feature request | `proposal.md` draft (problem, scope, success criteria, non-goals, risks, open questions) | Direction approved and requirement specific enough to drive spec generation | Proceed to `generate-spec` | Refine scope; re-run brainstorm until requirement is concrete and bounded |
-| `generate-spec` | Approved `proposal.md` draft | `proposal.md` (final), `design.md`, `tasks.md`, spec deltas under `openspec/specs/` | Change directory exists under `openspec/changes/<change>/`; all required artifacts are present and non-empty | Proceed to `harden-spec` | Identify which artifact is absent or malformed; regenerate; re-check gate |
+| `generate-spec` | Approved `proposal.md` draft | `proposal.md` (final), `design.md`, `tasks.md`, spec deltas under `openspec/changes/<change>/specs/` | Change directory exists under `openspec/changes/<change>/`; all required artifacts are present and non-empty | Proceed to `harden-spec` | Identify which artifact is absent or malformed; regenerate; re-check gate |
 | `harden-spec` | Artifacts from `generate-spec` | Validated artifacts with any findings recorded; independent adversarial review result committed alongside | Validation passes with no schema or structural errors; no unresolved blocker surfaced by adversarial review; all review findings synced back into the artifacts | Proceed to `plan-from-spec` | Route back to `harden-spec`: resolve each blocker, update artifacts, re-run validation and adversarial review |
 | `plan-from-spec` | Hardened and validated spec artifacts | `tasks.md` updated with an explicit task plan that names the spec and design version it is based on | A plan exists in `tasks.md`; the plan is explicitly anchored to the hardened spec (references the validated design artifact) | Proceed to `check-coverage` | Revise `tasks.md` to add missing plan steps or explicit spec anchoring; re-check gate |
 | `check-coverage` | `tasks.md` plan, `design.md`, spec deltas | Coverage matrix (requirement × plan step × verification path) | Every requirement in the spec has at least one plan step and at least one verification path (test or observable check) | Proceed to `execute-plan` | Extend `tasks.md` with steps or verification paths for uncovered requirements; rebuild and re-check matrix |
@@ -37,11 +37,19 @@ artifacts are the single source of truth.
 
 ### Purpose
 
-Each gate, when it passes, writes a signed evidence record. On any subsequent resume the
-orchestrator recomputes artifact digests and compares them against the stored record. If a verified
-artifact has changed, that gate and every downstream gate are invalidated and the flow routes back
-to the appropriate stage. A pass marker is honored only when every recorded digest still matches
-its corresponding on-disk file.
+Each gate, when it passes, writes an evidence record. This record is **not** a trusted or
+tamper-proof token — it is a cache that is always re-validated, never believed on its own. On any
+subsequent resume the orchestrator recomputes artifact digests and compares them against the stored
+record. If a verified artifact has changed, that gate and every downstream gate are invalidated and
+the flow routes back to the appropriate stage. A pass marker is honored only when every recorded
+digest still matches its corresponding on-disk file.
+
+Because the record is plain editable YAML, it carries no authority by itself: a hand-edited or
+forged `result: passed` cannot smuggle an unverified change through, because the digests it claims
+must still match disk **and** the substantive checks a gate depends on (tests actually run,
+adversarial review actually returned a verdict, user confirmation actually obtained) are re-derived
+or re-run rather than inferred from the record. Treat the evidence record as a resume hint and an
+audit breadcrumb, not as proof of work.
 
 ### Evidence record location and shape
 
@@ -88,7 +96,7 @@ passed_at: <ISO-8601 timestamp>
 artifacts:
   - path: openspec/changes/<change>/design.md
     sha256: <hex>
-  - path: openspec/specs/<delta-file>
+  - path: openspec/changes/<change>/specs/<capability>/spec.md
     sha256: <hex>
   - ...
 implementation:

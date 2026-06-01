@@ -130,25 +130,32 @@ changes (docs / formatting / comments).
 
 ### Codex
 
-1. Clone the repository and copy (or symlink) each `skills/<name>/SKILL.md` into your
-   Codex skills directory:
+The skill bodies load their protocols with relative paths like `references/<file>.md`,
+resolved **relative to the plugin root**. So `skills/` and `references/` MUST stay
+colocated under one common root — do **not** scatter skills into a flat
+`~/.codex/skills/` while moving `references/` elsewhere, or the mandatory stage,
+compliance, and archive protocols will fail to resolve.
+
+1. Install the plugin as a single directory, keeping its layout intact:
 
    ```bash
-   git clone https://github.com/suka/specpowers-flow /tmp/specpowers-flow
-   cp -r /tmp/specpowers-flow/skills/* ~/.codex/skills/
+   git clone https://github.com/suka/specpowers-flow \
+     ~/.codex/plugins/specpowers-flow
    ```
 
-2. Copy the `references/` directory alongside the skills so relative paths resolve:
+   This keeps `~/.codex/plugins/specpowers-flow/skills/` and
+   `~/.codex/plugins/specpowers-flow/references/` under the same root, so every
+   `references/<file>.md` referenced from a `SKILL.md` resolves correctly.
 
-   ```bash
-   cp -r /tmp/specpowers-flow/references ~/.codex/references
-   ```
+2. Point your Codex skills configuration at
+   `~/.codex/plugins/specpowers-flow/skills/` (use a symlink into your Codex skills
+   directory if it must live elsewhere — symlink the whole plugin dir, not individual
+   skills, so the `references/` sibling travels with it).
 
-   If your Codex skills directory is elsewhere, adjust paths accordingly.
-
-3. Codex reads `skills/<name>/SKILL.md` directly. The frontmatter `name` field matches
-   the directory name; `description` contains the trigger phrases Codex uses to select
-   the skill.
+3. Codex reads each `skills/<name>/SKILL.md` directly. The frontmatter `name` field
+   matches the directory name; `description` contains the trigger phrases Codex uses to
+   select the skill. When a skill says "read `references/<file>.md`", resolve it from the
+   plugin root above.
 
 ---
 

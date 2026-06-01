@@ -115,7 +115,7 @@ changes (docs / formatting / comments).
 1. Clone the repository into your Claude Code plugins directory:
 
    ```bash
-   git clone https://github.com/suka/specpowers-flow \
+   git clone https://github.com/ujffdi/specpowers-flow \
      ~/.claude/plugins/specpowers-flow
    ```
 
@@ -141,7 +141,7 @@ compliance, and archive protocols will fail to resolve.
 1. Install the plugin as a single directory, keeping its layout intact:
 
    ```bash
-   git clone https://github.com/suka/specpowers-flow \
+   git clone https://github.com/ujffdi/specpowers-flow \
      ~/.codex/plugins/specpowers-flow
    ```
 

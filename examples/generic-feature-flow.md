@@ -103,33 +103,46 @@ checked at middleware registration time (startup), not per request.
 **Spec delta — `openspec/changes/add-rate-limit-api-endpoint/specs/search-rate-limit/spec.md`:**
 
 ```markdown
-## ADDED: Per-user rate limit on /search
+## ADDED Requirements
 
-### REQ-001
+### Requirement: quota enforcement (REQ-001)
+
 The `/search` endpoint SHALL reject any authenticated request from a user who has already issued
 60 or more requests within the current 60-second fixed window, responding with HTTP 429 and a
 `Retry-After` header whose value is the number of whole seconds remaining until the next window
 boundary.
 
-**Scenario A:** A user issues their 60th request in a window — it succeeds with HTTP 200.
-**Scenario B:** The same user issues their 61st request in the same window — it receives HTTP 429
-with `Retry-After` set to a positive integer.
+#### Scenario: 60th request succeeds
 
-### REQ-002
+- **WHEN** a user issues their 60th request within a fixed 60-second window
+- **THEN** the response is HTTP 200
+
+#### Scenario: 61st request is rejected
+
+- **WHEN** the same user issues their 61st request within the same window
+- **THEN** the response is HTTP 429 with `Retry-After` set to a positive integer
+
+### Requirement: fixed-window counter (REQ-002)
+
 The rate-limit counter SHALL use fixed 60-second windows aligned to the Unix epoch (multiples of
 60 seconds), not a rolling window from the time of the first request.
 
-**Scenario C:** A user issues 60 requests starting at t=0 s into the window, then a 61st request
-at t=1 s — it receives HTTP 429. The same user's 62nd request at t=61 s (one second into the next
-window) receives HTTP 200, because the counter reset.
+#### Scenario: window boundary resets counter
 
-### REQ-003
+- **WHEN** a user issues 60 requests starting at t=0 s into a window, then a 61st request at t=1 s
+- **THEN** the 61st request receives HTTP 429
+- **AND** the same user's next request at t=61 s (one second into the next window) receives HTTP 200 because the counter reset
+
+### Requirement: feature flag bypass (REQ-003)
+
 When the `RATE_LIMIT_ENABLED` environment variable is set to `false` at application startup, the
 rate-limit middleware SHALL be disabled and all requests to `/search` SHALL be processed without
 quota enforcement.
 
-**Scenario D:** With `RATE_LIMIT_ENABLED=false`, a user issues 200 requests in one minute — all
-receive HTTP 200.
+#### Scenario: middleware disabled by flag
+
+- **WHEN** `RATE_LIMIT_ENABLED=false` and a user issues 200 requests in one minute
+- **THEN** all requests receive HTTP 200
 ```
 
 **Gate check:** change directory exists, all three required artifacts plus the spec delta are
@@ -155,13 +168,16 @@ Default to rejecting if uncertain. List concrete blockers with file and section.
 The practitioner accepts the finding. The spec delta is updated:
 
 ```markdown
-### REQ-004  (ADDED to address harden-spec finding)
+### Requirement: Redis failure behavior (REQ-004)  ← ADDED to address harden-spec finding
+
 When the Redis backend is unreachable at the time of a rate-limit check, the `/search` endpoint
 SHALL respond with HTTP 503 and a `Retry-After: 5` header rather than processing the request
 without quota enforcement or raising an unhandled exception.
 
-**Scenario E:** Redis is unavailable; a user issues a request to `/search` — the response is
-HTTP 503 with `Retry-After: 5`.
+#### Scenario: Redis unavailable
+
+- **WHEN** the Redis backend is unreachable and a user issues a request to `/search`
+- **THEN** the response is HTTP 503 with `Retry-After: 5`
 ```
 
 The reviewer re-runs validation. No further blockers. Finding is recorded in the sidecar review

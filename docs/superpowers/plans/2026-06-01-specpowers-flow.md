@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build `specpowers-flow`, a self-contained, cross-platform skill **plugin** (orchestrator + 5 phase skills + 9 reference templates) that fuses Superpowers process discipline with OpenSpec's spec-driven artifact lifecycle, publishable to GitHub.
+**Goal:** Build `specpowers-flow`, a self-contained, cross-platform skill **plugin** (orchestrator + 5 phase skills + 10 reference templates) that fuses Superpowers process discipline with OpenSpec's spec-driven artifact lifecycle, publishable to GitHub.
 
-**Architecture:** A multi-skill plugin. One orchestrator skill (`specpowers-flow`) drives an 8-stage state machine, infers stage from on-disk OpenSpec artifacts, enforces gates, selects a tier (quick/standard/full), and routes failures. Five phase skills carry the per-stage logic. Nine platform-agnostic reference templates in `references/` hold the heavy protocols and are shared by all skills. The deliverable is pure markdown + a JSON manifest — no runtime code — verified by a structure-validation shell script that acts as the test harness.
+**Architecture:** A multi-skill plugin. One orchestrator skill (`specpowers-flow`) drives an 8-stage state machine, infers stage from on-disk OpenSpec artifacts, enforces gates, selects a tier (quick/standard/full), and routes failures. Five phase skills carry the per-stage logic. Ten platform-agnostic reference templates in `references/` hold the heavy protocols and are shared by all skills. The deliverable is pure markdown + a JSON manifest — no runtime code — verified by a structure-validation shell script that acts as the test harness.
 
 **Tech Stack:** Markdown (SKILL.md + references), JSON (`plugin.json`), Bash + `jq` (validation script). Targets Claude Code plugin format and Codex skill format.
 
@@ -27,6 +27,7 @@
 | `references/tiering-rules.md` | quick/standard/full selection + non-overridable escalation |
 | `references/independent-review.md` | Adversarial-subagent dispatch pattern (CC + Codex) |
 | `references/subagent-execution.md` | Per-task subagent execution protocol (fresh subagent + two-stage review, tier-scaled) |
+| `references/test-driven-development.md` | RED→GREEN→REFACTOR test-first discipline + per-task test-first sub-gate |
 | `references/adversarial-spec-review.md` | Spec-review checklist (harden-spec) |
 | `references/plan-coverage-matrix.md` | Requirement→plan→test coverage table + rules |
 | `references/compliance-verification.md` | Implementation-vs-spec verification |
@@ -83,7 +84,7 @@ REQUIRED=(
   skills/specpowers-build/SKILL.md skills/specpowers-archive/SKILL.md
   references/stage-protocol.md references/openspec-artifact-format.md
   references/tiering-rules.md references/independent-review.md
-  references/subagent-execution.md
+  references/subagent-execution.md references/test-driven-development.md
   references/adversarial-spec-review.md references/plan-coverage-matrix.md
   references/compliance-verification.md references/archive-checklist.md
 )
@@ -310,7 +311,7 @@ Source of truth: spec §5 (build row), §8 (Subagent-driven execution), §11 ite
 
 Required content (the self-contained per-task subagent execution protocol used by `execute-plan`):
 1. Why: each `tasks.md` task runs in a **fresh subagent** with only the context it needs (the task text, the relevant spec delta, its coverage-matrix row) so each implementation step stays in a clean, focused context and scope cannot silently drift across the whole change. This reimplements Superpowers' subagent-driven discipline self-contained.
-2. Per-task loop: dispatch task subagent → it implements with TDD (write failing test → minimal code → green) → returns its diff + test evidence → orchestrator runs a **two-stage review** (stage 1: does it satisfy the task + its coverage row & tests pass; stage 2: independent adversarial check via `references/independent-review.md` for risky tasks) → only then dispatch the next task.
+2. Per-task loop: dispatch task subagent → it implements **test-first per `references/test-driven-development.md`** (RED failing test → minimal code → GREEN) → returns its diff + RED/GREEN test evidence → orchestrator runs a **two-stage review** (stage 1: does it satisfy the task + its coverage row, was the test RED-before/GREEN-after, do tests pass; stage 2: independent adversarial check via `references/independent-review.md` for risky tasks) → only then dispatch the next task.
 3. Divergence rule: if a task needs to deviate from spec/plan, the subagent **stops** and the artifact (spec delta / `tasks.md`) is updated first (which invalidates downstream gates per `references/stage-protocol.md`), then work resumes.
 4. Tier scaling: `quick` may execute inline in a single context (no per-task subagents); `standard`/`full` use one subagent per task; `full` adds the independent adversarial check on every code-changing task, `standard` on risky tasks only.
 5. Progressive enhancement: when real Superpowers is detected, hand off to its `subagent-driven-development`/`executing-plans`; otherwise use this protocol.
@@ -322,6 +323,33 @@ Required content (the self-contained per-task subagent execution protocol used b
 ```bash
 git add references/subagent-execution.md
 git commit -m "docs(ref): add per-task subagent execution protocol"
+```
+
+---
+
+## Task 5c: `references/test-driven-development.md`
+
+**Files:**
+- Create: `references/test-driven-development.md`
+
+Source of truth: spec §8 (Test-driven execution) + §11 item 10.
+
+- [ ] **Step 1: Write the file**
+
+Required content (the self-contained test-first discipline used inside each `execute-plan` task):
+1. The loop: **write a failing test** that pins the task's spec requirement → **run it, confirm it fails for the right reason (RED)** → **write the minimal implementation** → **run it green (GREEN)** → **refactor** → **commit**. State plainly: **no implementation is written without a failing test first.**
+2. **Test-first sub-gate of `execute-plan`:** a task is not "done" unless it introduced or extended a test that was RED before its code and GREEN after. The task subagent must show the RED run and the GREEN run as evidence.
+3. What counts as a proper test: tests behavior/requirement (not implementation detail), fails for the stated reason, is deterministic, and maps to a coverage-matrix row. Anti-patterns to reject: tests written after the code to rubber-stamp it, tautological asserts, tests that never failed.
+4. Tier scaling: `standard`/`full` enforce strict per-task RED→GREEN ordering; `quick` requires at least one real test per change but may relax strict per-task ordering.
+5. Relationship to other refs: complements `references/plan-coverage-matrix.md` (every requirement has a verification path) and `references/compliance-verification.md` (catches missing tests); the RED/GREEN evidence feeds the `execute-plan` gate per `references/subagent-execution.md`.
+6. Progressive enhancement: hand off to real Superpowers `test-driven-development` when present; otherwise use this protocol.
+
+- [ ] **Step 2: Run validator** → Expected: no new FAIL lines.
+- [ ] **Step 3: Commit**
+
+```bash
+git add references/test-driven-development.md
+git commit -m "docs(ref): add test-first RED-GREEN discipline and test-first sub-gate"
 ```
 
 ---
@@ -576,7 +604,7 @@ description: Use as stages 6-7 of specpowers-flow — execute the approved plan 
 ```
 
 Body:
-1. Execute-plan: run the **subagent-driven execution protocol** in `references/subagent-execution.md` — one fresh subagent per `tasks.md` task with a two-stage review between tasks, TDD, no silent scope expansion; if implementation must diverge from spec/plan, the task subagent stops and the artifact is updated first (invalidating downstream gates per `references/stage-protocol.md`); preserve each task's diff + test evidence. Tier-scaled (quick may run inline; standard/full use per-task subagents). Gate = implementation complete & tests run & evidence preserved.
+1. Execute-plan: run the **subagent-driven execution protocol** in `references/subagent-execution.md` — one fresh subagent per `tasks.md` task with a two-stage review between tasks, **test-first per `references/test-driven-development.md`** (RED→GREEN, no implementation without a failing test first), no silent scope expansion; if implementation must diverge from spec/plan, the task subagent stops and the artifact is updated first (invalidating downstream gates per `references/stage-protocol.md`); preserve each task's diff + RED/GREEN evidence. Tier-scaled (quick may run inline + ≥1 real test; standard/full use per-task subagents + strict per-task RED→GREEN). Gate = implementation complete & tests run (test-first sub-gate satisfied) & evidence preserved.
 2. Verify-compliance: apply `references/compliance-verification.md` using the independent-review pattern (`references/independent-review.md`); check literal-but-incomplete compliance, missing failure paths/tests, out-of-scope behavior. Record gate evidence digests **including the implementation evidence set** (coverage-area file digests + git diff/tree hash). Gate = compliance passes & tests pass & no unresolved blocker. Next → specpowers-archive.
 
 - [ ] **Step 2: Run validator** → Expected: `OK: skill specpowers-build: ...`.
@@ -655,7 +683,7 @@ Source of truth: spec §12 acceptance criteria #11.
 Required sections:
 1. What it is (one paragraph) + the 8-stage spine diagram.
 2. Why (the manual-discipline problem it solves).
-3. The 6 skills + 9 references, one line each.
+3. The 6 skills + 10 references, one line each.
 4. Tiering (quick/standard/full) + the non-overridable escalation note.
 5. Install — Claude Code (clone into the plugins dir / marketplace) and Codex (skills dir), with the exact paths.
 6. Usage: the trigger phrases; new change vs resume.
@@ -664,7 +692,7 @@ Required sections:
 - [ ] **Step 2: Run full validator in final mode — everything passes**
 
 Run: `bash scripts/validate-plugin.sh --final`
-Expected: `OK: all 20 required files present`, ends with `ALL CHECKS PASSED`, exit 0. No FAIL/PENDING lines anywhere.
+Expected: `OK: all 21 required files present`, ends with `ALL CHECKS PASSED`, exit 0. No FAIL/PENDING lines anywhere.
 
 - [ ] **Step 3: Commit**
 
@@ -682,7 +710,7 @@ git commit -m "docs: add README with install and usage for Claude Code + Codex"
 - [ ] **Step 1: Full structure validation (final mode)**
 
 Run: `bash scripts/validate-plugin.sh --final`
-Expected: `OK: all 20 required files present`, `ALL CHECKS PASSED`, exit 0. Any `FAIL:`/`PENDING:` line blocks completion.
+Expected: `OK: all 21 required files present`, `ALL CHECKS PASSED`, exit 0. Any `FAIL:`/`PENDING:` line blocks completion.
 
 - [ ] **Step 2: Cross-reference completeness — every reference is actually used**
 
@@ -709,6 +737,6 @@ git commit -m "chore: final integration validation for specpowers-flow plugin" -
 
 ## Self-Review notes (author)
 
-- **Spec coverage:** Tasks map to spec §5 (skills: T10-15), §6 (stage-protocol + gate evidence: T2, T10), §7 (tiering + escalation: T4), §8 (independent review T5, subagent-driven execution T5b/T14, fallback archive T9, progressive enhancement T10/T15, de-dup T11/T13), §9 (structure: all), §11 (9 references: T2-9b), §12 (acceptance: T18 step 3), §13 (example: T16). README → criterion 12 (T17). No spec section left without a task.
+- **Spec coverage:** Tasks map to spec §5 (skills: T10-15), §6 (stage-protocol + gate evidence: T2, T10), §7 (tiering + escalation: T4), §8 (independent review T5, subagent-driven execution T5b/T14, test-first TDD T5c/T14, fallback archive T9, progressive enhancement T10/T15, de-dup T11/T13), §9 (structure: all), §11 (10 references: T2-9b), §12 (acceptance: T18 step 3), §13 (example: T16). README → criterion 14 (T17). No spec section left without a task.
 - **No placeholders:** validator Step 4 enforces this mechanically on every run.
 - **Naming consistency:** skill dir names == frontmatter `name` (validator check 2); reference filenames match those used in skill bodies (validator check 3 + T18 step 2).

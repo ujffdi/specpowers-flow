@@ -62,7 +62,7 @@ A multi-skill plugin: **1 orchestrator + 5 phase skills = 6 skills.**
 | `specpowers-brainstorm` | 1 | Idea → problem / scope / success criteria / non-goals / risks / open questions; writes the `proposal.md` draft directly |
 | `specpowers-spec` | 2–3 | Generate OpenSpec artifacts + **harden** (validate + adversarial spec review via independent subagent + sync findings back) |
 | `specpowers-plan` | 4–5 | Plan from the hardened spec (into `tasks.md`) + **requirement coverage matrix** gate |
-| `specpowers-build` | 6–7 | **Subagent-driven** TDD execution — fresh subagent per `tasks.md` task with two-stage review, no silent scope expansion, diverge → update artifact first — then **compliance verification** via independent subagent |
+| `specpowers-build` | 6–7 | **Subagent-driven, test-first** execution — fresh subagent per `tasks.md` task with two-stage review; each task obeys the RED→GREEN→REFACTOR TDD discipline (failing test before code); no silent scope expansion, diverge → update artifact first — then **compliance verification** via independent subagent |
 | `specpowers-archive` | 8 | Archive-readiness gate checklist + update living specs + final summary |
 
 Each skill = "one self-contained process segment + its gate." `brainstorm` is standalone because
@@ -151,6 +151,18 @@ off to its `subagent-driven-development`/`executing-plans`; the self-contained p
 `references/subagent-execution.md`. Tier-scaled: `quick` may execute inline (single context);
 `standard`/`full` use per-task subagents.
 
+**Test-driven execution (test-first discipline).** Inside each `execute-plan` task, code is written
+**test-first**: write a failing test that pins the task's spec requirement → run it and confirm it
+fails for the right reason (RED) → write the minimal implementation → run it green (GREEN) → refactor
+→ commit. **No implementation is written without a failing test first.** This is an explicit sub-gate
+of `execute-plan`: a task is not "done" unless it introduced/extended a test that was RED before its
+code and GREEN after. The discipline, what counts as a proper test, and the test-first sub-gate are
+defined in `references/test-driven-development.md` (reimplemented self-contained; hands off to real
+Superpowers `test-driven-development` when present). Tier note: `quick` still requires at least one
+real test per change but may relax strict per-task RED→GREEN ordering; `standard`/`full` enforce it
+per task. This complements the coverage matrix (every requirement has a verification path) and
+compliance verification (catches missing tests).
+
 **Artifact-inferred state.** See §6. Detection logic lives in the orchestrator skill.
 
 **De-duplication.** Brainstorm output *is* the `proposal.md` draft; the plan *is* `tasks.md`. No
@@ -189,6 +201,7 @@ specpowers-flow/
 │   ├── tiering-rules.md             # quick/standard/full selection rules
 │   ├── independent-review.md        # subagent adversarial-review pattern (cross-platform)
 │   ├── subagent-execution.md        # self-contained per-task subagent execution protocol
+│   ├── test-driven-development.md   # test-first RED→GREEN discipline + test-first sub-gate
 │   ├── adversarial-spec-review.md   # ⭐ used by harden-spec
 │   ├── plan-coverage-matrix.md      # ⭐ requirement→plan→test coverage table + pass/fail rules
 │   ├── compliance-verification.md   # ⭐ implementation-vs-spec verification
@@ -225,26 +238,28 @@ licenses, so the repo can be published cleanly under its own LICENSE.
 7. `plan-coverage-matrix.md` — `Requirement | Plan Step | Implementation Area | Test/Verification | Status` table + pass/fail rules.
 8. `compliance-verification.md` — verify implementation against spec/tests/plan; catch literal-but-incomplete compliance, missing failure paths, missing tests, out-of-scope behavior.
 9. `archive-checklist.md` — readiness checklist + required archive summary (change name, implementation summary, verification summary, archive path/result, residual risks).
+10. `test-driven-development.md` — the RED→GREEN→REFACTOR test-first discipline, what counts as a proper test, the per-task test-first sub-gate, and tier scaling; hands off to real Superpowers when present.
 
 ## 12. Acceptance criteria
 
 MVP is ready for GitHub release when:
 
 1. Orchestrator + 5 phase skills exist and can guide the full workflow.
-2. All 9 reference templates exist.
+2. All 10 reference templates exist.
 3. Tiering works: a small change can take the `quick` path; a large change takes `full`.
 4. Adversarial gates (harden-spec, verify-compliance) dispatch independent subagents.
 5. **Subagent-driven execution**: in `standard`/`full`, `execute-plan` runs one fresh subagent per `tasks.md` task with a two-stage review between tasks; `quick` may run inline; real Superpowers is used when present.
-6. Stage is correctly inferred from on-disk artifacts (resume works from a cold start).
-7. The skill explicitly blocks archive before validation, plan coverage, tests, and compliance pass.
-8. Progressive enhancement: detects and uses real `openspec`/Superpowers when present, falls back otherwise.
-9. **Fallback archive is conservative**: with no `openspec` CLI, archive defaults to guided/manual merge with preflight diff + backup; never auto-corrupts living specs; any auto-apply is atomic + conflict-checked + idempotent.
-10. **Gate evidence is content-bound, including implementation**: each passed gate records verified-artifact digests; compliance additionally records the implementation evidence set (coverage-matrix files + git diff/tree hash). Editing any verified artifact **or implementation file** invalidates that gate and all downstream gates on resume; archive recomputes the compliance implementation digests before passing.
-11. **Non-overridable escalation**: high-risk surfaces (auth/permissions, data migration, destructive/irreversible ops, tenant/security boundaries, billing) force `standard`/`full` with independent compliance review and a **mandatory real spec delta** (no "justification instead of delta" escape; `no-spec-delta` only for independently-reviewed non-behavioral changes), regardless of tier or user override.
-12. **Structure validator is completeness-checked**: it asserts the exact required file set exists (6 skills, 9 references, README, example, LICENSE, NOTICE, manifest) and fails on any missing path or zero skills — a partial/empty repo cannot report all-passed.
-13. README explains what/when/how-to-install for both Claude Code and Codex.
-14. At least one complete example flow is included.
-15. No verbatim content copied from the source projects; NOTICE present.
+6. **Test-first execution**: each `execute-plan` task introduces/extends a test that was RED before its code and GREEN after; no implementation without a failing test first (`standard`/`full` enforce strict per-task RED→GREEN; `quick` requires ≥1 real test per change).
+7. Stage is correctly inferred from on-disk artifacts (resume works from a cold start).
+8. The skill explicitly blocks archive before validation, plan coverage, tests, and compliance pass.
+9. Progressive enhancement: detects and uses real `openspec`/Superpowers when present, falls back otherwise.
+10. **Fallback archive is conservative**: with no `openspec` CLI, archive defaults to guided/manual merge with preflight diff + backup; never auto-corrupts living specs; any auto-apply is atomic + conflict-checked + idempotent.
+11. **Gate evidence is content-bound, including implementation**: each passed gate records verified-artifact digests; compliance additionally records the implementation evidence set (coverage-matrix files + git diff/tree hash). Editing any verified artifact **or implementation file** invalidates that gate and all downstream gates on resume; archive recomputes the compliance implementation digests before passing.
+12. **Non-overridable escalation**: high-risk surfaces (auth/permissions, data migration, destructive/irreversible ops, tenant/security boundaries, billing) force `standard`/`full` with independent compliance review and a **mandatory real spec delta** (no "justification instead of delta" escape; `no-spec-delta` only for independently-reviewed non-behavioral changes), regardless of tier or user override.
+13. **Structure validator is completeness-checked**: it asserts the exact required file set exists (6 skills, 10 references, README, example, LICENSE, NOTICE, manifest) and fails on any missing path or zero skills — a partial/empty repo cannot report all-passed.
+14. README explains what/when/how-to-install for both Claude Code and Codex.
+15. At least one complete example flow is included.
+16. No verbatim content copied from the source projects; NOTICE present.
 
 ## 13. Success metric
 

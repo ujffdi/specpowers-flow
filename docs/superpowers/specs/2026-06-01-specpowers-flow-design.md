@@ -89,9 +89,13 @@ validation, then archive on stale markers" hole.
 **Change-set hash algorithm (exact, repo-agnostic).** Because each task commits during the TDD loop,
 a plain `git diff` after commits is empty and would falsely read as "no change." The compliance
 evidence first **resolves a base ref** (recording `base_ref`, `base_oid`, `merge_base_oid`) in this
-order: a configured base (from project config / CLAUDE.md) → the current branch's upstream
-(`@{upstream}`) → first existing of `origin/main`, `main`, `origin/master`, `master`, `trunk`. If
-none is reachable, it **stops with an explicit setup prompt** rather than guessing. Against the
+order: (1) a configured review base (from project config / CLAUDE.md); (2) first existing of the
+well-known trunk refs `origin/main`, `main`, `origin/master`, `master`, `trunk`; (3) the branch
+`@{upstream}` **only if** it is not the current branch's own remote-tracking ref (a feature branch's
+upstream is usually itself — using it makes `merge_base..HEAD` empty after push). The resolver
+**must never** pick the current feature branch or its own tracking ref as the base. If none of the
+above resolves to a real merge target, it **stops with an explicit setup prompt** rather than
+guessing. Against the
 resolved base it then records: the **commit range** `merge_base_oid..HEAD`, the **HEAD tree OID**, a
 **dirty-worktree diff hash** (staged + unstaged), and an **untracked-relevant file list** (untracked
 files under any Implementation-Area path). Archive recomputes all of these using the same recorded
